@@ -17,4 +17,4 @@ COPY . .
 EXPOSE 3000
 
 # Commande de démarrage officielle
-CMD ["node", "index.js"]
+CMD ["node", "index.js"]s
