@@ -1,5 +1,5 @@
-# Utilisation de la version LTS de Node (Linux Debian)
-FROM node:lts-bookworm-slim
+# Utilisation de la version LTS de Node (Linux Debian 13 : glibc >= 2.38 requise par sqlite3 v6)
+FROM node:lts-trixie-slim
 
 # Définition du dossier de travail dans le conteneur
 WORKDIR /app

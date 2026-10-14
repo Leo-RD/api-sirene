@@ -1,0 +1,13 @@
+services:
+  api:
+    build: .
+    ports: ["3000:3000"]
+    volumes:
+      - ./sirene.db:/app/sirene.db
+  stats:
+    build: ./stats-service
+    ports: ["8000:8000"]
+    environment:
+      DB_PATH: /data/sirene.db
+    volumes:
+      - ./sirene.db:/data/sirene.db:ro
