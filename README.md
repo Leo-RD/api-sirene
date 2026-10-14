@@ -5,7 +5,7 @@ Projet composé de deux services Docker qui partagent une base SQLite issue des 
 | Service | Techno | Port | Rôle |
 |---------|--------|------|------|
 | `api`   | Node.js + Express | 3000 | Recherche d'entreprises par SIREN, code activité (NAF/APE) ou dénomination ; modification et suppression d'enregistrements |
-| `stats` | Python + FastAPI + [Polars](https://pola.rs/) | 8000 | Statistiques sur les codes activité (agrégations faites par Polars, pas de `GROUP BY` SQL) |
+| `stats` | Python + FastAPI + [Polars](https://pola.rs/) | 8000 | Statistiques par code activité et par année de création (agrégations faites par Polars, pas de `GROUP BY` SQL) |
 
 Chaque service sert sa propre documentation interactive (Swagger / OpenAPI).
 
@@ -110,11 +110,18 @@ curl -X DELETE http://localhost:3000/api/v1/entreprises/325175
 |---------|-------|-------------|
 | `GET` | `/api/v1/stats/activites?top=20&etat=A` | Classement des codes activité : nombre d'entreprises, nombre d'actives, part en %. `top` (1–2000, défaut 20) et `etat` (`A` actif / `C` cessé) sont optionnels |
 | `GET` | `/api/v1/stats/activites/{code}` | Détail d'un code activité : total, répartition par état administratif et par tranche d'effectifs (404 si code inconnu) |
+| `GET` | `/api/v1/stats/annees?code_activite=&etat=&debut=&fin=` | Nombre d'entreprises créées par année (avec nombre d'actives et cumul). Tous les filtres sont optionnels ; `nb_sans_date` compte les entreprises sans date de création connue |
+| `GET` | `/api/v1/stats/annees/{annee}?top=10` | Détail d'une année : total, actives et codes activité les plus fréquents (404 si aucune création) |
+
+> Les dates de création absentes ou égales à `1900-01-01` (valeur utilisée par l'INSEE pour une date inconnue) sont exclues des statistiques par année.
 
 ```bash
 curl "http://localhost:8000/api/v1/stats/activites?top=10"
 curl "http://localhost:8000/api/v1/stats/activites?etat=A"
 curl http://localhost:8000/api/v1/stats/activites/32.12Z
+curl "http://localhost:8000/api/v1/stats/annees?debut=2000&fin=2010"
+curl "http://localhost:8000/api/v1/stats/annees?code_activite=32.12Z"
+curl "http://localhost:8000/api/v1/stats/annees/2008?top=5"
 ```
 
 ## Structure du projet
