@@ -1,8 +1,13 @@
 # API Sirene – Express
 
-API REST locale (Node.js + Express) permettant d'interroger une base SQLite issue des données ouvertes **Sirene** : recherche d'entreprises par SIREN, code activité (NAF/APE) ou dénomination, ainsi que modification et suppression d'enregistrements.
+Projet composé de deux services Docker qui partagent une base SQLite issue des données ouvertes **Sirene** :
 
-La documentation interactive de l'API (Swagger / OpenAPI) est servie par l'application elle-même.
+| Service | Techno | Port | Rôle |
+|---------|--------|------|------|
+| `api`   | Node.js + Express | 3000 | Recherche d'entreprises par SIREN, code activité (NAF/APE) ou dénomination ; modification et suppression d'enregistrements |
+| `stats` | Python + FastAPI + [Polars](https://pola.rs/) | 8000 | Statistiques sur les codes activité (agrégations faites par Polars, pas de `GROUP BY` SQL) |
+
+Chaque service sert sa propre documentation interactive (Swagger / OpenAPI).
 
 ## Prérequis
 
@@ -28,7 +33,16 @@ Pour le développement, avec redémarrage automatique à chaque modification (vi
 npm run dev
 ```
 
-### Option 2 – Avec Docker
+### Option 2 – Avec Docker Compose (recommandé : les deux services)
+
+```bash
+docker compose up --build        # ajouter -d pour lancer en arrière-plan
+docker compose down              # arrêter
+```
+
+`sirene.db` est monté en volume dans les deux conteneurs : en lecture/écriture pour `api`, en lecture seule pour `stats`. Les modifications faites via l'API (PATCH / DELETE) sont donc conservées et immédiatement visibles dans les statistiques (la base est relue à chaque requête).
+
+### Option 3 – API seule avec Docker
 
 ```bash
 # 1. Construire l'image
@@ -54,10 +68,12 @@ Au démarrage, la console affiche notamment :
 ✅ Connecté à sirene.db
 ```
 
-- API : <http://localhost:3000>
-- Documentation Swagger : <http://localhost:3000/api-docs>
+- API : <http://localhost:3000> – documentation : <http://localhost:3000/api-docs>
+- Service stats : <http://localhost:8000> – documentation : <http://localhost:8000/docs>
 
 ## Endpoints
+
+### Service `api` (port 3000)
 
 | Méthode  | Route                                             | Description                                              |
 |----------|---------------------------------------------------|----------------------------------------------------------|
@@ -88,20 +104,44 @@ curl -X PATCH http://localhost:3000/api/v1/entreprises/325175 \
 curl -X DELETE http://localhost:3000/api/v1/entreprises/325175
 ```
 
+### Service `stats` (port 8000)
+
+| Méthode | Route | Description |
+|---------|-------|-------------|
+| `GET` | `/api/v1/stats/activites?top=20&etat=A` | Classement des codes activité : nombre d'entreprises, nombre d'actives, part en %. `top` (1–2000, défaut 20) et `etat` (`A` actif / `C` cessé) sont optionnels |
+| `GET` | `/api/v1/stats/activites/{code}` | Détail d'un code activité : total, répartition par état administratif et par tranche d'effectifs (404 si code inconnu) |
+
+```bash
+curl "http://localhost:8000/api/v1/stats/activites?top=10"
+curl "http://localhost:8000/api/v1/stats/activites?etat=A"
+curl http://localhost:8000/api/v1/stats/activites/32.12Z
+```
+
 ## Structure du projet
 
 ```
 .
-├── index.js          # Serveur Express, routes et configuration Swagger
-├── sirene.db         # Base de données SQLite (données Sirene)
-├── package.json      # Dépendances et scripts npm
-├── Dockerfile        # Image Docker de l'application
-└── .dockerignore
+├── index.js              # Service api : serveur Express, routes et Swagger
+├── package.json          # Dépendances et scripts npm
+├── Dockerfile            # Image Docker du service api
+├── .dockerignore
+├── stats-service/        # Service stats
+│   ├── main.py           # Application FastAPI + agrégations Polars
+│   ├── requirements.txt  # fastapi, uvicorn, polars
+│   └── Dockerfile        # Image Docker du service stats
+├── docker-compose.yml    # Orchestration des deux services
+└── sirene.db             # Base SQLite (données Sirene), partagée
 ```
 
 ## Stack technique
+
+**Service `api`**
 
 - [Express 5](https://expressjs.com/) – serveur HTTP
 - [sqlite3](https://github.com/TryGhost/node-sqlite3) – accès à la base SQLite
 - [swagger-jsdoc](https://github.com/Surnet/swagger-jsdoc) + [swagger-ui-express](https://github.com/scottie1984/swagger-ui-express) – documentation OpenAPI
 - [nodemon](https://nodemon.io/) – rechargement automatique en développement
+
+**Service `stats`**
+- [FastAPI](https://fastapi.tiangolo.com/) + [Uvicorn](https://www.uvicorn.org/) – serveur HTTP et documentation OpenAPI
+- [Polars](https://pola.rs/) – agrégations analytiques en mémoire
