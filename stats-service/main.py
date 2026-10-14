@@ -1,6 +1,7 @@
 import os
 import sqlite3
 from contextlib import closing
+from functools import lru_cache
 
 import polars as pl
 from fastapi import FastAPI, HTTPException, Query
@@ -11,10 +12,11 @@ DATE_INCONNUE = "1900-01-01"
 app = FastAPI(title="Sirene Stats", version="1.0.0")
 
 
-def load() -> pl.DataFrame:
+@lru_cache(maxsize=1)
+def _load(mtime: float) -> pl.DataFrame:
     # Lecture brute : aucun GROUP BY côté SQL
     with closing(sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)) as conn:
-        return pl.read_database(
+        df = pl.read_database(
             """SELECT siren,
                       activite_principale_unite_legale AS code_activite,
                       etat_administratif_unite_legale  AS etat,
@@ -22,12 +24,18 @@ def load() -> pl.DataFrame:
                       date_creation_unite_legale       AS date_creation
                FROM mytable""",
             conn,
-        ).with_columns(
-            pl.when(pl.col("date_creation") == DATE_INCONNUE)
-            .then(None)
-            .otherwise(pl.col("date_creation").str.slice(0, 4).cast(pl.Int32, strict=False))
-            .alias("annee_creation")
         )
+    # Année nulle si la date est absente ou inconnue (1900-01-01)
+    return df.with_columns(
+        pl.when(pl.col("date_creation") != DATE_INCONNUE)
+        .then(pl.col("date_creation").str.to_date().dt.year())
+        .alias("annee_creation")
+    )
+
+
+def load() -> pl.DataFrame:
+    # La base n'est relue que si le fichier a changé (ex : PATCH / DELETE via l'API)
+    return _load(os.path.getmtime(DB_PATH))
 
 
 @app.get("/api/v1/stats/activites")
@@ -67,35 +75,22 @@ def stats_une_activite(code: str):
 @app.get("/api/v1/stats/annees")
 def stats_annees(
     code_activite: str | None = None,
-    etat: str | None = None,
     debut: int | None = Query(None, description="Première année incluse"),
     fin: int | None = Query(None, description="Dernière année incluse"),
 ):
-    df = load()
+    df = load().drop_nulls("annee_creation")
     if code_activite:
         df = df.filter(pl.col("code_activite") == code_activite)
-    if etat:
-        df = df.filter(pl.col("etat") == etat)
-    sans_date = df.filter(pl.col("annee_creation").is_null()).height
-    df = df.filter(pl.col("annee_creation").is_not_null())
     if debut is not None:
         df = df.filter(pl.col("annee_creation") >= debut)
     if fin is not None:
         df = df.filter(pl.col("annee_creation") <= fin)
-    return {
-        "nb_entreprises": df.height,
-        "nb_sans_date": sans_date,
-        "annees": (
-            df.group_by("annee_creation")
-            .agg(
-                pl.len().alias("nb_entreprises"),
-                (pl.col("etat") == "A").sum().alias("nb_actives"),
-            )
-            .sort("annee_creation")
-            .with_columns(pl.col("nb_entreprises").cum_sum().alias("cumul"))
-            .to_dicts()
-        ),
-    }
+    return (
+        df.group_by("annee_creation")
+        .agg(pl.len().alias("nb_entreprises"))
+        .sort("annee_creation")
+        .to_dicts()
+    )
 
 
 @app.get("/api/v1/stats/annees/{annee}")
@@ -106,7 +101,6 @@ def stats_une_annee(annee: int, top: int = Query(10, ge=1, le=2000)):
     return {
         "annee_creation": annee,
         "nb_entreprises": df.height,
-        "nb_actives": df.filter(pl.col("etat") == "A").height,
         "top_activites": (
             df.group_by("code_activite")
             .agg(pl.len().alias("nb_entreprises"))

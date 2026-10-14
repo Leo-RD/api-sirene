@@ -110,8 +110,8 @@ curl -X DELETE http://localhost:3000/api/v1/entreprises/325175
 |---------|-------|-------------|
 | `GET` | `/api/v1/stats/activites?top=20&etat=A` | Classement des codes activité : nombre d'entreprises, nombre d'actives, part en %. `top` (1–2000, défaut 20) et `etat` (`A` actif / `C` cessé) sont optionnels |
 | `GET` | `/api/v1/stats/activites/{code}` | Détail d'un code activité : total, répartition par état administratif et par tranche d'effectifs (404 si code inconnu) |
-| `GET` | `/api/v1/stats/annees?code_activite=&etat=&debut=&fin=` | Nombre d'entreprises créées par année (avec nombre d'actives et cumul). Tous les filtres sont optionnels ; `nb_sans_date` compte les entreprises sans date de création connue |
-| `GET` | `/api/v1/stats/annees/{annee}?top=10` | Détail d'une année : total, actives et codes activité les plus fréquents (404 si aucune création) |
+| `GET` | `/api/v1/stats/annees?code_activite=&debut=&fin=` | Nombre d'entreprises créées par année. Tous les filtres sont optionnels |
+| `GET` | `/api/v1/stats/annees/{annee}?top=10` | Détail d'une année : nombre de créations et codes activité les plus fréquents (404 si aucune création) |
 
 > Les dates de création absentes ou égales à `1900-01-01` (valeur utilisée par l'INSEE pour une date inconnue) sont exclues des statistiques par année.
 
