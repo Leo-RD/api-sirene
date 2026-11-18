@@ -4,12 +4,18 @@ from contextlib import closing
 from functools import lru_cache
 
 import polars as pl
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
+
+from auth import require_role
 
 DB_PATH = os.getenv("DB_PATH", "/data/sirene.db")
 # Date utilisée par l'INSEE quand la date de création est inconnue
 DATE_INCONNUE = "1900-01-01"
-app = FastAPI(title="Sirene Stats", version="1.0.0")
+# Toutes les routes exigent un token Keycloak avec le rôle sirene-read
+app = FastAPI(
+    title="Sirene Stats", version="1.0.0",
+    dependencies=[Depends(require_role("sirene-read"))],
+)
 
 
 @lru_cache(maxsize=1)

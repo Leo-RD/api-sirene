@@ -1,13 +1,37 @@
+# Paramètres communs pour vérifier les JWT
+x-auth-env: &auth-env
+  # Clés publiques : récupérées via le réseau Docker interne (nom du service "keycloak")
+  KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/sirene/protocol/openid-connect/certs
+  # Émetteur attendu dans le claim "iss" : l'URL par laquelle le CLIENT a obtenu le token
+  KEYCLOAK_ISSUER: http://localhost:8080/realms/sirene
+
 services:
   api:
     build: .
     ports: ["3000:3000"]
+    environment: *auth-env
     volumes:
       - ./sirene.db:/app/sirene.db
+    depends_on: [keycloak]
   stats:
     build: ./stats-service
     ports: ["8000:8000"]
     environment:
+      <<: *auth-env
       DB_PATH: /data/sirene.db
     volumes:
       - ./sirene.db:/data/sirene.db:ro
+    depends_on: [keycloak]
+
+  # Serveur SSO (OAuth2 / OpenID Connect) qui délivre les JWT
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    # start-dev : mode développement (HTTP, pas de config TLS)
+    # --import-realm : importe les fichiers JSON de /opt/keycloak/data/import au démarrage
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    ports: ["8080:8080"]
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro

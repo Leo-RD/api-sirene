@@ -1,0 +1,45 @@
+{
+  "realm": "sirene",
+  "enabled": true,
+
+  "roles": {
+    "realm": [
+      { "name": "sirene-read",  "description": "Lecture des données Sirene" },
+      { "name": "sirene-write", "description": "Modification / suppression des données Sirene" }
+    ]
+  },
+
+  "clients": [
+    {
+      "clientId": "sirene-client",
+      "name": "Client de test de l'API Sirene",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true
+    }
+  ],
+
+  "users": [
+    {
+      "username": "lecteur",
+      "email": "lecteur@example.com",
+      "firstName": "Lea",
+      "lastName": "Lecteur",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "lecteur", "temporary": false }],
+      "realmRoles": ["sirene-read"]
+    },
+    {
+      "username": "editeur",
+      "email": "editeur@example.com",
+      "firstName": "Eric",
+      "lastName": "Editeur",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "editeur", "temporary": false }],
+      "realmRoles": ["sirene-read", "sirene-write"]
+    }
+  ]
+}

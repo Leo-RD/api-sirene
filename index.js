@@ -2,6 +2,7 @@ const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
+const { authenticate, requireRole } = require('./auth');
 
 const app = express();
 const port = 3000;
@@ -25,6 +26,13 @@ const swaggerOptions = {
         description: 'Serveur local de développement',
       },
     ],
+    // Ajoute le bouton "Authorize" dans Swagger pour coller un JWT
+    components: {
+      securitySchemes: {
+        bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+      },
+    },
+    security: [{ bearerAuth: [] }],
   },
   // Spécifie à Swagger de lire ce fichier-ci pour trouver les commentaires @swagger
   apis: ['./index.js'],
@@ -64,6 +72,10 @@ const db = new sqlite3.Database('./sirene.db', sqlite3.OPEN_READWRITE, (err) => 
  *           type: integer
  *         description: Le numéro SIREN (ex 325175)
  *     responses:
+ *       401:
+ *         description: Token absent ou invalide.
+ *       403:
+ *         description: Rôle insuffisant.
  *       200:
  *         description: Succès, les données de l'entreprise sont retournées.
  *       404:
@@ -71,7 +83,7 @@ const db = new sqlite3.Database('./sirene.db', sqlite3.OPEN_READWRITE, (err) => 
  *       500:
  *         description: Erreur serveur.
  */
-app.get('/api/v1/entreprises/:siren', (req, res) => {
+app.get('/api/v1/entreprises/:siren', authenticate, requireRole('sirene-read'), (req, res) => {
     const siren = req.params.siren;
     
     db.get("SELECT * FROM mytable WHERE siren = ?", [siren], (err, row) => {
@@ -99,6 +111,10 @@ app.get('/api/v1/entreprises/:siren', (req, res) => {
  *           type: string
  *         description: Nom de l'entreprise (ex CARPENTIER)
  *     responses:
+ *       401:
+ *         description: Token absent ou invalide.
+ *       403:
+ *         description: Rôle insuffisant.
  *       200:
  *         description: Liste des entreprises correspondantes.
  *       400:
@@ -106,7 +122,7 @@ app.get('/api/v1/entreprises/:siren', (req, res) => {
  *       500:
  *         description: Erreur serveur.
  */
-app.get('/api/v1/entreprises', (req, res) => {
+app.get('/api/v1/entreprises', authenticate, requireRole('sirene-read'), (req, res) => {
     const code_activite = req.query.code_activite;
     const denomination = req.query.denomination;
 
@@ -151,6 +167,10 @@ app.get('/api/v1/entreprises', (req, res) => {
  *                 type: string
  *                 example: NOUVEAU NOM SARL
  *     responses:
+ *       401:
+ *         description: Token absent ou invalide.
+ *       403:
+ *         description: Rôle insuffisant.
  *       200:
  *         description: Mise à jour réussie.
  *       400:
@@ -158,7 +178,7 @@ app.get('/api/v1/entreprises', (req, res) => {
  *       404:
  *         description: Entreprise introuvable.
  */
-app.patch('/api/v1/entreprises/:siren', (req, res) => {
+app.patch('/api/v1/entreprises/:siren', authenticate, requireRole('sirene-write'), (req, res) => {
     const siren = req.params.siren;
     const nouveauNom = req.body.nom_unite_legale; 
 
@@ -186,12 +206,16 @@ app.patch('/api/v1/entreprises/:siren', (req, res) => {
  *         schema:
  *           type: integer
  *     responses:
+ *       401:
+ *         description: Token absent ou invalide.
+ *       403:
+ *         description: Rôle insuffisant.
  *       204:
  *         description: Suppression réussie (pas de contenu).
  *       404:
  *         description: Entreprise introuvable.
  */
-app.delete('/api/v1/entreprises/:siren', (req, res) => {
+app.delete('/api/v1/entreprises/:siren', authenticate, requireRole('sirene-write'), (req, res) => {
     const siren = req.params.siren;
 
     db.run("DELETE FROM mytable WHERE siren = ?", [siren], function(err) {

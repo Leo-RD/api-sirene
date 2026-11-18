@@ -3,3 +3,7 @@ npm-debug.log
 Dockerfile
 .dockerignore
 stats-service
+keycloak
+gateway
+.env
+.git
